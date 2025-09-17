@@ -26,9 +26,21 @@ SECRET_KEY = config('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG_MODE', cast=bool)
+DB_MODE = config('DB_MODE')
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 
+CSRF_COOKIE_SECURE = True 
+SESSION_COOKIE_SECURE = True 
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+CSRF_TRUSTED_ORIGINS = ['http://127.0.0.1', 'http://localhost',]
+
+if DB_MODE == 'production':
+    if config('ALLOWED_APPS'):
+        ALLOWED_HOSTS += str(config('ALLOWED_APPS')).split(',')
+    if config('ALLOWED_HOSTS'):
+        CSRF_TRUSTED_ORIGINS += str(config('ALLOWED_HOSTS')).split(',')
 
 # Application definition
 
@@ -39,16 +51,28 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.humanize', # int comma
+    'django.contrib.sitemaps', # sitemap.xml
+    'django.contrib.sites',
+    'tinymce',
+    "corsheaders",
+    'rest_framework',
+    'core',
 ]
 
+SITE_ID = 1
+
 MIDDLEWARE = [
+    'django.middleware.gzip.GZipMiddleware', # gzip middleware 
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    "corsheaders.middleware.CorsMiddleware", # cors middleware 
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware', # whitenoise middleware
 ]
 
 ROOT_URLCONF = 'tapi.urls'
@@ -56,7 +80,7 @@ ROOT_URLCONF = 'tapi.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -74,12 +98,25 @@ WSGI_APPLICATION = 'tapi.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+if DB_MODE == 'production':
+    DATABASES = {
+        'default': {
+            'ENGINE': config('DB_ENGINE'),
+            'NAME': config('DB_NAME'),
+            'HOST': config('DB_HOST'),
+            'PORT': config('DB_PORT'),
+            'USER': config('DB_USER'),
+            'PASSWORD': config('DB_PASSWORD')
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
+
 
 
 # Password validation
@@ -116,9 +153,51 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 STATIC_URL = 'static/'
+STATICFILES_DIRS = [
+    BASE_DIR / 'public',
+]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+AUTH_USER_MODEL = 'core.User'
+
+# CORS Config 
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost',
+    'http://127.0.0.1',
+]
+
+if config('CORS_ALLOWED_ORIGINS'):
+    CORS_ALLOWED_ORIGINS += str(config('CORS_ALLOWED_ORIGINS')).split(',')
+
+
+CORS_ALLOW_METHODS = (
+    "DELETE",
+    "GET",
+    "OPTIONS",
+    "PATCH",
+    "POST",
+    "PUT",
+)
+
+CORS_ALLOW_HEADERS = (
+    "accept",
+    "authorization",
+    "content-type",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+)
+
+CORS_ALLOW_CREDENTIALS = True # allow cookies, ... 
+
+DATA_UPLOAD_MAX_NUMBER_FIELDS = config('DATA_UPLOAD_MAX_NUMBER_FIELDS', cast=int) or 5000 # bulk action 
+
+# Common config 
+ADMIN_ROUTE = config('ADMIN_ROUTE')
